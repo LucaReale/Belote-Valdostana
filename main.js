@@ -270,7 +270,13 @@ function applyBid(playerId, action) {
     game.passCount += 1;
     game.bidHistory.push({ player: playerId, text: 'passo' });
   } else if (action.raise) {
-    game.currentBid = { ...game.currentBid, amount: game.currentBid.amount + 10 };
+    // Se l'avversario ha rilanciato sopra il compagno, la nuova puntata deve superare l'attuale
+    const teamBid = game.bidHistory.find((h) => {
+      const pid = h.player;
+      return pid !== playerId && PLAYERS[pid].team === PLAYERS[playerId].team && !['passo','do 10','alzo','alzo 10','ancora','ancora 10'].includes(h.text);
+    });
+    const baseAmount = game.currentBid ? game.currentBid.amount + 10 : 92;
+    game.currentBid = { player: playerId, team: PLAYERS[playerId].team, suit: game.currentBid?.suit || action.suit, amount: baseAmount };
     game.passCount = 0;
     game.playerRaiseCount[playerId] = (game.playerRaiseCount[playerId] || 0) + 1;
     game.bidHistory.push({ player: playerId, text: action.signal });
@@ -629,15 +635,22 @@ function statusHtml() {
 function biddingPanelHtml() {
   const me = currentPlayerId();
   if (game.phase !== 'bidding' || game.bidder !== me) return '';
-  const partnerOpened = game.currentBid && PLAYERS[me].team === game.currentBid.team && game.currentBid.player !== me;
+  const myTeam = PLAYERS[me].team;
+  const teammateHasBid = game.bidHistory.some((h) => {
+    const pid = h.player;
+    return pid !== me && PLAYERS[pid].team === myTeam && h.text !== 'passo' && !h.text.startsWith('do') && !h.text.startsWith('alzo') && !h.text.startsWith('ancora');
+  }) || (game.currentBid && game.currentBid.team === myTeam && game.currentBid.player !== me);
+  const partnerOpened = teammateHasBid;
   const myRaises = game.playerRaiseCount?.[me] ?? 0;
   if (partnerOpened) {
     const raiseButtons = myRaises === 0
-      ? `<button class="primary" id="raiseDo10"><span>↑</span>Do 10 (ho J o 9)</button>
-         <button class="primary" id="raiseAlzo"><span>↑</span>Alzo (ho 3 atout)</button>
-         <button class="primary" id="raiseAlzo10"><span>↑</span>Alzo 10 (ho 3 atout con J o 9)</button>`
-      : `<button class="primary" id="raiseAncora"><span>↑</span>Ancora (stessa cosa)</button>
-         <button class="primary" id="raiseAncora10"><span>↑</span>Ancora 10 (ho 2 con J o 9)</button>`;
+      ? `<button class="primary" id="raiseDo10"><span>↑</span>Do 10 (1 carta: J o 9)</button>
+         <button class="primary" id="raiseAncora"><span>↑</span>Ancora (2 carte)</button>
+         <button class="primary" id="raiseAncora10"><span>↑</span>Ancora 10 (2 carte con J o 9)</button>
+         <button class="primary" id="raiseAlzo"><span>↑</span>Alzo (3 carte)</button>
+         <button class="primary" id="raiseAlzo10"><span>↑</span>Alzo 10 (3 carte con J o 9)</button>`
+      : `<button class="primary" id="raiseAncora"><span>↑</span>Ancora</button>
+         <button class="primary" id="raiseAncora10"><span>↑</span>Ancora 10</button>`;
     return `
       <div class="panel control-panel">
         <div class="panel-title"><span>♔</span><span>Risposta al compagno (+10)</span></div>
