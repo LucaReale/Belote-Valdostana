@@ -634,8 +634,10 @@ function biddingPanelHtml() {
   if (partnerOpened) {
     const raiseButtons = myRaises === 0
       ? `<button class="primary" id="raiseDo10"><span>↑</span>Do 10 (ho J o 9)</button>
-         <button class="primary" id="raiseAlzo"><span>↑</span>Alzo (ho 3+ atout)</button>`
-      : `<button class="primary" id="raiseAncora"><span>↑</span>Ancora (+10)</button>`;
+         <button class="primary" id="raiseAlzo"><span>↑</span>Alzo (ho 3 atout)</button>
+         <button class="primary" id="raiseAlzo10"><span>↑</span>Alzo 10 (ho 3 atout con J o 9)</button>`
+      : `<button class="primary" id="raiseAncora"><span>↑</span>Ancora (stessa cosa)</button>
+         <button class="primary" id="raiseAncora10"><span>↑</span>Ancora 10 (ho 2 con J o 9)</button>`;
     return `
       <div class="panel control-panel">
         <div class="panel-title"><span>♔</span><span>Risposta al compagno (+10)</span></div>
@@ -801,7 +803,9 @@ function bindEvents() {
   document.querySelector('#passBid')?.addEventListener('click', () => pushBid(currentPlayerId(), { pass: true }));
   document.querySelector('#raiseDo10')?.addEventListener('click', () => pushBid(currentPlayerId(), { raise: true, signal: 'do 10' }));
   document.querySelector('#raiseAlzo')?.addEventListener('click', () => pushBid(currentPlayerId(), { raise: true, signal: 'alzo' }));
+  document.querySelector('#raiseAlzo10')?.addEventListener('click', () => pushBid(currentPlayerId(), { raise: true, signal: 'alzo 10' }));
   document.querySelector('#raiseAncora')?.addEventListener('click', () => pushBid(currentPlayerId(), { raise: true, signal: 'ancora' }));
+  document.querySelector('#raiseAncora10')?.addEventListener('click', () => pushBid(currentPlayerId(), { raise: true, signal: 'ancora 10' }));
   document.querySelector('#saySpeech')?.addEventListener('click', () => {
     const speech = finalSpeech(game.hands[currentPlayerId()], game.currentBid.suit);
     if (online.enabled) sendOnlineAction({ type: 'speech', text: speech });
