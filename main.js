@@ -72,6 +72,7 @@ function newRound(scores = [0, 0], starter = 0, message = 'Guarda le carte, sceg
     currentBid: null,
     bidHistory: [],
     passCount: 0,
+    playerRaiseCount: [0, 0, 0, 0],
     finalSpeech: [],
     declaredPlayers: [false, false, false, false],
     declaredAnnouncements: [[], []],
@@ -268,6 +269,11 @@ function applyBid(playerId, action) {
   if (action.pass) {
     game.passCount += 1;
     game.bidHistory.push({ player: playerId, text: 'passo' });
+  } else if (action.raise) {
+    game.currentBid = { ...game.currentBid, amount: game.currentBid.amount + 10 };
+    game.passCount = 0;
+    game.playerRaiseCount[playerId] = (game.playerRaiseCount[playerId] || 0) + 1;
+    game.bidHistory.push({ player: playerId, text: action.signal });
   } else {
     game.currentBid = { player: playerId, team: PLAYERS[playerId].team, suit: action.suit, amount: action.amount };
     game.passCount = 0;
@@ -290,7 +296,9 @@ function applyBid(playerId, action) {
 
 function pushBid(playerId, action) {
   if (online.enabled) {
-    sendOnlineAction(action.pass ? { type: 'pass' } : { type: 'bid', suit: action.suit, amount: action.amount });
+    if (action.pass) sendOnlineAction({ type: 'pass' });
+    else if (action.raise) sendOnlineAction({ type: 'raise', signal: action.signal });
+    else sendOnlineAction({ type: 'bid', suit: action.suit, amount: action.amount });
     return;
   }
   applyBid(playerId, action);
@@ -330,11 +338,18 @@ function runBiddingBots() {
   while (game.phase === 'bidding' && !canControlPlayer(game.bidder)) {
     const playerId = game.bidder;
     let bid = bestBidFor(game.hands[playerId], game.currentBid);
-    const isPartnerAnswer = playerId === PARTNER_ID && game.currentBid?.player === 0 && game.currentBid.team === PLAYERS[playerId].team;
+    const partnerTeam = PLAYERS[playerId].team;
+    const isPartnerAnswer = game.currentBid?.team === partnerTeam && game.currentBid.player !== playerId;
     if (isPartnerAnswer) {
-      const signal = partnerSignal(game.hands[playerId], game.currentBid);
-      game.bidHistory.push({ player: playerId, text: signal });
-      bid = signal.includes('alzo') ? { suit: game.currentBid.suit, amount: game.currentBid.amount + (signal.includes('dieci') ? 10 : 1) } : null;
+      const myRaises = game.playerRaiseCount?.[playerId] ?? 0;
+      const signal = myRaises > 0 ? 'passo' : partnerSignal(game.hands[playerId], game.currentBid);
+      if (signal !== 'passo') {
+        applyBid(playerId, { raise: true, signal });
+      } else {
+        applyBid(playerId, { pass: true });
+      }
+      if (game.phase !== 'bidding') return;
+      continue;
     }
     applyBid(playerId, bid ? { suit: bid.suit, amount: bid.amount } : { pass: true });
     if (game.phase !== 'bidding') return;
@@ -614,6 +629,35 @@ function statusHtml() {
 function biddingPanelHtml() {
   const me = currentPlayerId();
   if (game.phase !== 'bidding' || game.bidder !== me) return '';
+  const partnerOpened = game.currentBid && PLAYERS[me].team === game.currentBid.team && game.currentBid.player !== me;
+  const myRaises = game.playerRaiseCount?.[me] ?? 0;
+  if (partnerOpened) {
+    const raiseButtons = myRaises === 0
+      ? `<button class="primary" id="raiseDo10"><span>↑</span>Do 10 (ho J o 9)</button>
+         <button class="primary" id="raiseAlzo"><span>↑</span>Alzo (ho 3+ atout)</button>`
+      : `<button class="primary" id="raiseAncora"><span>↑</span>Ancora (+10)</button>`;
+    return `
+      <div class="panel control-panel">
+        <div class="panel-title"><span>♔</span><span>Risposta al compagno (+10)</span></div>
+        <div class="button-row" style="flex-direction:column;gap:6px">
+          ${raiseButtons}
+          <button class="secondary" id="passBid"><span>×</span>Passo</button>
+        </div>
+        <details style="margin-top:8px">
+          <summary style="font-size:0.8em;opacity:0.7;cursor:pointer">Apri su altro seme</summary>
+          <div class="suit-grid" style="margin-top:6px">
+            ${SUITS.map(
+              (suit) => `<button class="suit-button ${selectedSuit === suit.id ? 'active' : ''}" data-suit="${suit.id}"><span>${suit.symbol}</span><span>${suit.name}</span></button>`,
+            ).join('')}
+          </div>
+          <label class="range-row">
+            <span>Min ${minimumBid(game.currentBid, selectedSuit)}</span>
+            <input id="bidAmount" min="${minimumBid(game.currentBid, selectedSuit)}" max="162" step="1" type="number" value="${selectedAmount}" />
+          </label>
+          <button class="primary full" id="makeBid" style="margin-top:6px"><span>↑</span>Apri su ${SUIT_BY_ID[selectedSuit].name}</button>
+        </details>
+      </div>`;
+  }
   const minimum = minimumBid(game.currentBid, selectedSuit);
   selectedAmount = Math.max(selectedAmount, minimum);
   return `
@@ -755,6 +799,9 @@ function bindEvents() {
     pushBid(currentPlayerId(), { suit: selectedSuit, amount: selectedAmount });
   });
   document.querySelector('#passBid')?.addEventListener('click', () => pushBid(currentPlayerId(), { pass: true }));
+  document.querySelector('#raiseDo10')?.addEventListener('click', () => pushBid(currentPlayerId(), { raise: true, signal: 'do 10' }));
+  document.querySelector('#raiseAlzo')?.addEventListener('click', () => pushBid(currentPlayerId(), { raise: true, signal: 'alzo' }));
+  document.querySelector('#raiseAncora')?.addEventListener('click', () => pushBid(currentPlayerId(), { raise: true, signal: 'ancora' }));
   document.querySelector('#saySpeech')?.addEventListener('click', () => {
     const speech = finalSpeech(game.hands[currentPlayerId()], game.currentBid.suit);
     if (online.enabled) sendOnlineAction({ type: 'speech', text: speech });
