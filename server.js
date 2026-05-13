@@ -63,6 +63,8 @@ function newRound(scores = [0, 0], starter = 0, message = 'Guarda le carte, sceg
     bidHistory: [],
     passCount: 0,
     playerRaiseCount: [0, 0, 0, 0],
+    teamLastRealBid: [null, null],
+    playerRaisedSuits: [[], [], [], []],
     finalSpeech: [],
     declaredPlayers: [false, false, false, false],
     declaredAnnouncements: [[], []],
@@ -248,19 +250,19 @@ function applyAction(room, token, action) {
   }
   if (action.type === 'raise') {
     if (game.phase !== 'bidding' || game.bidder !== playerId) throw new Error('not your bid');
-    if (!game.currentBid || game.currentBid.team !== PLAYERS[playerId].team || game.currentBid.player === playerId) throw new Error('cannot raise own bid');
-    game.currentBid = { ...game.currentBid, amount: game.currentBid.amount + 10 };
+    const myTeam = PLAYERS[playerId].team;
+    const partnerBid = game.teamLastRealBid[myTeam];
+    if (!partnerBid || partnerBid.player === playerId) throw new Error('nessun compagno ha aperto');
+    if ((game.playerRaisedSuits[playerId] || []).includes(partnerBid.suit)) throw new Error('hai già rilanciato questo seme');
+    const newAmount = Math.max(game.currentBid ? game.currentBid.amount : 0, partnerBid.amount) + 10;
+    game.currentBid = { player: playerId, team: myTeam, suit: partnerBid.suit, amount: newAmount };
     game.passCount = 0;
     game.playerRaiseCount[playerId] = (game.playerRaiseCount[playerId] || 0) + 1;
+    if (!game.playerRaisedSuits[playerId]) game.playerRaisedSuits[playerId] = [];
+    game.playerRaisedSuits[playerId].push(partnerBid.suit);
     game.bidHistory.push({ player: playerId, text: action.signal || 'alzo' });
-    if (game.currentBid && game.passCount >= 3) {
-      game.phase = 'speech';
-      game.speechPlayer = game.currentBid.player;
-      game.message = 'Giro assi: aspetto solo con almeno un asso non di atout.';
-    } else {
-      game.bidder = nextPlayer(playerId);
-      game.message = `Tocca a ${PLAYERS[game.bidder].name}.`;
-    }
+    game.bidder = nextPlayer(playerId);
+    game.message = `Tocca a ${PLAYERS[game.bidder].name}.`;
     return;
   }
   if (action.type === 'bid' || action.type === 'pass') {
@@ -273,6 +275,7 @@ function applyAction(room, token, action) {
       if (action.amount < min) throw new Error('bid too low');
       game.currentBid = { player: playerId, team: PLAYERS[playerId].team, suit: action.suit, amount: action.amount };
       game.passCount = 0;
+      game.teamLastRealBid[PLAYERS[playerId].team] = { player: playerId, suit: action.suit, amount: action.amount };
       game.bidHistory.push({ player: playerId, text: `${action.amount} a ${SUIT_BY_ID[action.suit].name}` });
     }
     if (game.currentBid && game.passCount >= 3) {
