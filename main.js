@@ -338,9 +338,9 @@ function applySpeech(playerId, text) {
 
 function startPlaying() {
   game.phase = 'playing';
-  game.activePlayer = game.currentBid.player;
-  game.trickLeader = game.currentBid.player;
-  game.message = `${PLAYERS[game.currentBid.player].name} ha aperto. Prima mano: dichiara gli accusi con il tasto, altrimenti non valgono.`;
+  game.activePlayer = game.starter;
+  game.trickLeader = game.starter;
+  game.message = `Inizia ${PLAYERS[game.starter].name}. Prima mano: dichiara gli accusi con il tasto, altrimenti non valgono.`;
   render();
   scheduleBots();
 }
