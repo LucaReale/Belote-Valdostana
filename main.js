@@ -73,6 +73,8 @@ function newRound(scores = [0, 0], starter = 0, message = 'Guarda le carte, sceg
     bidHistory: [],
     passCount: 0,
     playerRaiseCount: [0, 0, 0, 0],
+    teamLastRealBid: [null, null],
+    playerRaisedSuits: [[], [], [], []],
     finalSpeech: [],
     declaredPlayers: [false, false, false, false],
     declaredAnnouncements: [[], []],
@@ -270,19 +272,22 @@ function applyBid(playerId, action) {
     game.passCount += 1;
     game.bidHistory.push({ player: playerId, text: 'passo' });
   } else if (action.raise) {
-    // Se l'avversario ha rilanciato sopra il compagno, la nuova puntata deve superare l'attuale
-    const teamBid = game.bidHistory.find((h) => {
-      const pid = h.player;
-      return pid !== playerId && PLAYERS[pid].team === PLAYERS[playerId].team && !['passo','do 10','alzo','alzo 10','ancora','ancora 10'].includes(h.text);
-    });
-    const baseAmount = game.currentBid ? game.currentBid.amount + 10 : 92;
-    game.currentBid = { player: playerId, team: PLAYERS[playerId].team, suit: game.currentBid?.suit || action.suit, amount: baseAmount };
+    const myTeam = PLAYERS[playerId].team;
+    const partnerBid = game.teamLastRealBid[myTeam];
+    if (!partnerBid || partnerBid.player === playerId) throw new Error('nessun compagno ha aperto');
+    if ((game.playerRaisedSuits[playerId] || []).includes(partnerBid.suit)) throw new Error('hai già rilanciato questo seme');
+    // Il rilancio è sempre sul seme del compagno, sopra la puntata attuale
+    const newAmount = Math.max(game.currentBid ? game.currentBid.amount : 0, partnerBid.amount) + 10;
+    game.currentBid = { player: playerId, team: myTeam, suit: partnerBid.suit, amount: newAmount };
     game.passCount = 0;
     game.playerRaiseCount[playerId] = (game.playerRaiseCount[playerId] || 0) + 1;
+    if (!game.playerRaisedSuits[playerId]) game.playerRaisedSuits[playerId] = [];
+    game.playerRaisedSuits[playerId].push(partnerBid.suit);
     game.bidHistory.push({ player: playerId, text: action.signal });
   } else {
     game.currentBid = { player: playerId, team: PLAYERS[playerId].team, suit: action.suit, amount: action.amount };
     game.passCount = 0;
+    game.teamLastRealBid[PLAYERS[playerId].team] = { player: playerId, suit: action.suit, amount: action.amount };
     game.bidHistory.push({ player: playerId, text: `${action.amount} a ${SUIT_BY_ID[action.suit].name}` });
   }
   if (game.currentBid && game.passCount >= 3) {
@@ -345,10 +350,12 @@ function runBiddingBots() {
     const playerId = game.bidder;
     let bid = bestBidFor(game.hands[playerId], game.currentBid);
     const partnerTeam = PLAYERS[playerId].team;
-    const isPartnerAnswer = game.currentBid?.team === partnerTeam && game.currentBid.player !== playerId;
-    if (isPartnerAnswer) {
-      const myRaises = game.playerRaiseCount?.[playerId] ?? 0;
-      const signal = myRaises > 0 ? 'passo' : partnerSignal(game.hands[playerId], game.currentBid);
+    const partnerRealBid = game.teamLastRealBid?.[partnerTeam];
+    const canBotRaise = partnerRealBid &&
+      partnerRealBid.player !== playerId &&
+      !(game.playerRaisedSuits?.[playerId] || []).includes(partnerRealBid.suit);
+    if (canBotRaise) {
+      const signal = partnerSignal(game.hands[playerId], { suit: partnerRealBid.suit, amount: partnerRealBid.amount });
       if (signal !== 'passo') {
         applyBid(playerId, { raise: true, signal });
       } else {
@@ -636,21 +643,21 @@ function biddingPanelHtml() {
   const me = currentPlayerId();
   if (game.phase !== 'bidding' || game.bidder !== me) return '';
   const myTeam = PLAYERS[me].team;
-  const teammateHasBid = game.bidHistory.some((h) => {
-    const pid = h.player;
-    return pid !== me && PLAYERS[pid].team === myTeam && h.text !== 'passo' && !h.text.startsWith('do') && !h.text.startsWith('alzo') && !h.text.startsWith('ancora');
-  }) || (game.currentBid && game.currentBid.team === myTeam && game.currentBid.player !== me);
-  const partnerOpened = teammateHasBid;
+  const partnerRealBid = game.teamLastRealBid?.[myTeam];
+  const canRaise = partnerRealBid &&
+    partnerRealBid.player !== me &&
+    !(game.playerRaisedSuits?.[me] || []).includes(partnerRealBid.suit);
+  const partnerOpened = canRaise;
   const myRaises = game.playerRaiseCount?.[me] ?? 0;
   if (partnerOpened) {
-    const raiseButtons = myRaises === 0
-      ? `<button class="primary" id="raiseDo10"><span>↑</span>Do 10 (1 carta: J o 9)</button>
-         <button class="primary" id="raiseAncora"><span>↑</span>Ancora (2 carte)</button>
-         <button class="primary" id="raiseAncora10"><span>↑</span>Ancora 10 (2 carte con J o 9)</button>
-         <button class="primary" id="raiseAlzo"><span>↑</span>Alzo (3 carte)</button>
-         <button class="primary" id="raiseAlzo10"><span>↑</span>Alzo 10 (3 carte con J o 9)</button>`
-      : `<button class="primary" id="raiseAncora"><span>↑</span>Ancora</button>
-         <button class="primary" id="raiseAncora10"><span>↑</span>Ancora 10</button>`;
+    const SUIT_NAME = SUIT_BY_ID[partnerRealBid.suit].name;
+    const raiseButtons = `
+      <div style="font-size:0.8em;opacity:0.7;margin-bottom:4px">Rilancio a ${SUIT_NAME} (puntata attuale: ${game.currentBid?.amount ?? partnerRealBid.amount})</div>
+      <button class="primary" id="raiseDo10"><span>↑</span>Do 10 (1 carta: J o 9)</button>
+      <button class="primary" id="raiseAncora"><span>↑</span>Ancora (2 carte)</button>
+      <button class="primary" id="raiseAncora10"><span>↑</span>Ancora 10 (2 carte con J o 9)</button>
+      <button class="primary" id="raiseAlzo"><span>↑</span>Alzo (3 carte)</button>
+      <button class="primary" id="raiseAlzo10"><span>↑</span>Alzo 10 (3 carte con J o 9)</button>`;
     return `
       <div class="panel control-panel">
         <div class="panel-title"><span>♔</span><span>Risposta al compagno (+10)</span></div>
