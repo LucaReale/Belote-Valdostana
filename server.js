@@ -295,8 +295,8 @@ function applyAction(room, token, action) {
     game.finalSpeech.push({ player: playerId, text: finalSpeech(game.hands[playerId], game.currentBid.suit) });
     if (game.finalSpeech.length >= 4) {
       game.phase = 'playing';
-      game.activePlayer = game.currentBid.player;
-      game.trickLeader = game.currentBid.player;
+      game.activePlayer = game.starter;
+      game.trickLeader = game.starter;
       game.message = 'Prima mano: dichiara gli accusi con il tasto, altrimenti non valgono.';
     } else {
       game.speechPlayer = nextPlayer(playerId);
