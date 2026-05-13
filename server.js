@@ -97,7 +97,7 @@ function chooseWinner(trick, trump) {
 
 function minimumBid(currentBid, suit) {
   if (!currentBid) return 82;
-  return currentBid.suit === suit ? currentBid.amount + 1 : currentBid.amount + 10;
+  return currentBid.amount + 10;
 }
 
 function finalSpeech(hand, trump) {
