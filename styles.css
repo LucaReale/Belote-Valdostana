@@ -696,3 +696,151 @@ h1 {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Bid info row ── */
+.bid-info-row {
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  background: rgba(0,0,0,0.06);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+/* ── Raise grid (2-col) ── */
+.raise-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.raise-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border: none;
+  border-radius: 10px;
+  background: #2d6a4f;
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.raise-btn small {
+  font-size: 0.7rem;
+  font-weight: 400;
+  opacity: 0.82;
+}
+
+.raise-btn:active { opacity: 0.8; }
+
+.raise-btn.pass-btn {
+  background: #888;
+  grid-column: span 2;
+}
+
+/* ── Mobile overhaul (≤ 520px) ── */
+@media (max-width: 520px) {
+  .app-shell {
+    padding: 6px;
+  }
+
+  .topbar {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  h1 { font-size: 1.2rem; }
+
+  .scoreboard {
+    gap: 4px;
+  }
+
+  .score {
+    min-width: 70px;
+    padding: 5px 8px;
+  }
+
+  .score strong { font-size: 1.1rem; }
+
+  .game-layout {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  /* On mobile: board on top, side panel below */
+  .game-layout > .table { order: 1; }
+  .game-layout > .side-panel { order: 2; }
+
+  .table {
+    min-height: unset;
+  }
+
+  /* Tighter card table */
+  .middle-row {
+    grid-template-columns: 60px minmax(0, 1fr) 60px;
+    gap: 4px;
+  }
+
+  .playing-card {
+    width: 46px;
+  }
+
+  .playing-card .rank { font-size: 0.75rem; }
+  .playing-card .suit-symbol { font-size: 1.1rem; }
+
+  .compact .card-button {
+    margin-left: -36px;
+  }
+
+  .vertical-hand .card-button {
+    margin-top: -58px;
+  }
+
+  /* Human hand at bottom: smaller overlap */
+  .human-card {
+    margin-left: -20px;
+  }
+
+  .player-label {
+    font-size: 0.68rem;
+    padding: 3px 5px;
+  }
+
+  /* Side panel: horizontal scrollable sections */
+  .side-panel {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .panel {
+    padding: 10px;
+  }
+
+  .control-panel .button-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .suit-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .raise-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .raise-btn {
+    padding: 8px 4px;
+    font-size: 0.8rem;
+  }
+
+  .raise-btn small {
+    font-size: 0.65rem;
+  }
+}
