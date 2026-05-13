@@ -644,58 +644,42 @@ function biddingPanelHtml() {
   if (game.phase !== 'bidding' || game.bidder !== me) return '';
   const myTeam = PLAYERS[me].team;
   const partnerRealBid = game.teamLastRealBid?.[myTeam];
-  const canRaise = partnerRealBid &&
-    partnerRealBid.player !== me &&
-    !(game.playerRaisedSuits?.[me] || []).includes(partnerRealBid.suit);
-  const partnerOpened = canRaise;
-  const myRaises = game.playerRaiseCount?.[me] ?? 0;
-  if (partnerOpened) {
+  const alreadyRaisedThisSuit = (game.playerRaisedSuits?.[me] || []).includes(partnerRealBid?.suit);
+  const canRaise = partnerRealBid && partnerRealBid.player !== me && !alreadyRaisedThisSuit;
+
+  if (canRaise) {
+    // Raise mode: partner opened, I haven't raised yet on this suit
     const SUIT_NAME = SUIT_BY_ID[partnerRealBid.suit].name;
-    const raiseButtons = `
-      <div style="font-size:0.8em;opacity:0.7;margin-bottom:4px">Rilancio a ${SUIT_NAME} (puntata attuale: ${game.currentBid?.amount ?? partnerRealBid.amount})</div>
-      <button class="primary" id="raiseDo10"><span>↑</span>Do 10 (1 carta: J o 9)</button>
-      <button class="primary" id="raiseAncora"><span>↑</span>Ancora (2 carte)</button>
-      <button class="primary" id="raiseAncora10"><span>↑</span>Ancora 10 (2 carte con J o 9)</button>
-      <button class="primary" id="raiseAlzo"><span>↑</span>Alzo (3 carte)</button>
-      <button class="primary" id="raiseAlzo10"><span>↑</span>Alzo 10 (3 carte con J o 9)</button>`;
+    const SUIT_SYM = SUIT_BY_ID[partnerRealBid.suit].symbol;
+    const curAmt = game.currentBid?.amount ?? partnerRealBid.amount;
     return `
       <div class="panel control-panel">
-        <div class="panel-title"><span>♔</span><span>Risposta al compagno (+10)</span></div>
-        <div class="button-row" style="flex-direction:column;gap:6px">
-          ${raiseButtons}
-          <button class="secondary" id="passBid"><span>×</span>Passo</button>
+        <div class="panel-title"><span>${SUIT_SYM}</span><span>Risposta al compagno — ${SUIT_NAME}</span></div>
+        <div class="bid-info-row">Puntata attuale: <strong>${curAmt}</strong> → rilancio a <strong>${curAmt + 10}</strong></div>
+        <div class="raise-grid">
+          <button class="raise-btn" id="raiseDo10">Do 10<small>1 carta (J o 9)</small></button>
+          <button class="raise-btn" id="raiseAncora">Ancora<small>2 carte</small></button>
+          <button class="raise-btn" id="raiseAncora10">Ancora 10<small>2 carte con J/9</small></button>
+          <button class="raise-btn" id="raiseAlzo">Alzo<small>3 carte</small></button>
+          <button class="raise-btn" id="raiseAlzo10">Alzo 10<small>3 carte con J/9</small></button>
+          <button class="raise-btn pass-btn" id="passBid">Passo<small>—</small></button>
         </div>
-        <details style="margin-top:8px">
-          <summary style="font-size:0.8em;opacity:0.7;cursor:pointer">Apri su altro seme</summary>
-          <div class="suit-grid" style="margin-top:6px">
-            ${SUITS.map(
-              (suit) => `<button class="suit-button ${selectedSuit === suit.id ? 'active' : ''}" data-suit="${suit.id}"><span>${suit.symbol}</span><span>${suit.name}</span></button>`,
-            ).join('')}
-          </div>
-          <label class="range-row">
-            <span>Min ${minimumBid(game.currentBid, selectedSuit)}</span>
-            <input id="bidAmount" min="${minimumBid(game.currentBid, selectedSuit)}" max="162" step="1" type="number" value="${selectedAmount}" />
-          </label>
-          <button class="primary full" id="makeBid" style="margin-top:6px"><span>↑</span>Apri su ${SUIT_BY_ID[selectedSuit].name}</button>
-        </details>
       </div>`;
   }
+
+  // Normal opening mode — amount is fixed (82 or minimum), no manual input
   const minimum = minimumBid(game.currentBid, selectedSuit);
-  selectedAmount = Math.max(selectedAmount, minimum);
   return `
     <div class="panel control-panel">
-      <div class="panel-title"><span>♔</span><span>La tua puntata</span></div>
+      <div class="panel-title"><span>♔</span><span>La tua apertura</span></div>
       <div class="suit-grid">
         ${SUITS.map(
           (suit) => `<button class="suit-button ${selectedSuit === suit.id ? 'active' : ''}" data-suit="${suit.id}"><span>${suit.symbol}</span><span>${suit.name}</span></button>`,
         ).join('')}
       </div>
-      <label class="range-row">
-        <span>Base ${minimum}${game.currentBid && game.currentBid.suit !== selectedSuit ? ' (+10 cambio seme)' : ''}</span>
-        <input id="bidAmount" min="${minimum}" max="162" step="1" type="number" value="${selectedAmount}" />
-      </label>
+      <div class="bid-info-row">Apri a <strong>${minimum}</strong>${game.currentBid && game.currentBid.suit !== selectedSuit ? ' (+10 cambio seme)' : ''}</div>
       <div class="button-row">
-        <button class="primary" id="makeBid"><span>↑</span>Apri/Rialza</button>
+        <button class="primary" id="makeBid"><span>↑</span>Apri a ${minimum}</button>
         <button class="secondary" id="passBid"><span>×</span>Passo</button>
       </div>
     </div>`;
@@ -816,9 +800,8 @@ function bindEvents() {
     selectedAmount = Number(event.target.value);
   });
   document.querySelector('#makeBid')?.addEventListener('click', () => {
-    const minimum = minimumBid(game.currentBid, selectedSuit);
-    selectedAmount = Math.max(Number(document.querySelector('#bidAmount')?.value ?? minimum), minimum);
-    pushBid(currentPlayerId(), { suit: selectedSuit, amount: selectedAmount });
+    const amount = minimumBid(game.currentBid, selectedSuit);
+    pushBid(currentPlayerId(), { suit: selectedSuit, amount });
   });
   document.querySelector('#passBid')?.addEventListener('click', () => pushBid(currentPlayerId(), { pass: true }));
   document.querySelector('#raiseDo10')?.addEventListener('click', () => pushBid(currentPlayerId(), { raise: true, signal: 'do 10' }));
