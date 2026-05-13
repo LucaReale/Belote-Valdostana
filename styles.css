@@ -844,3 +844,80 @@ h1 {
     font-size: 0.65rem;
   }
 }
+
+/* ── Online lobby ── */
+.field-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.room-code-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(0,0,0,0.06);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+}
+.room-code-row strong { font-size: 1.1rem; flex: 1; }
+.copy-btn {
+  background: none; border: none; cursor: pointer; font-size: 1rem; padding: 2px 4px;
+}
+
+.lobby-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.lobby-team {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lobby-team-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  opacity: 0.55;
+  padding: 0 4px;
+}
+
+.lobby-seat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background: rgba(0,0,0,0.07);
+  cursor: pointer;
+  transition: background 0.15s;
+  position: relative;
+}
+.lobby-seat.free { border-color: rgba(0,0,0,0.12); }
+.lobby-seat.me { border-color: #2d6a4f; background: rgba(45,106,79,0.12); }
+.lobby-seat.taken { opacity: 0.7; cursor: default; }
+.lobby-seat-pos { font-size: 0.7rem; opacity: 0.55; }
+.lobby-seat-name { font-size: 0.88rem; font-weight: 600; }
+.lobby-you {
+  position: absolute; top: 4px; right: 6px;
+  font-size: 0.65rem; background: #2d6a4f; color: #fff;
+  padding: 1px 5px; border-radius: 6px;
+}
+
+.lobby-ready {
+  text-align: center;
+  color: #2d6a4f;
+  font-weight: 600;
+  margin: 4px 0 0;
+}
