@@ -33,7 +33,9 @@ let online = {
   token: ROOM_PARAM ? localStorage.getItem(`belote-token-${ROOM_PARAM}`) : '',
   playerId: ROOM_PARAM ? Number(localStorage.getItem(`belote-seat-${ROOM_PARAM}`)) : 0,
   preferredSeat: Number(localStorage.getItem('belote-preferred-seat') || 0),
+  playerName: localStorage.getItem('belote-player-name') || '',
   seats: {},
+  lobbyMode: false,
   error: '',
 };
 
@@ -126,7 +128,7 @@ function legalCards(hand, trick, trump) {
 
 function minimumBid(currentBid, suit) {
   if (!currentBid) return 82;
-  return currentBid.suit === suit ? currentBid.amount + 1 : currentBid.amount + 10;
+  return currentBid.amount + 10;
 }
 
 function currentPlayerId() {
@@ -535,6 +537,7 @@ function cardBackHtml() {
 }
 
 function playerName(playerId) {
+  if (online.enabled && playerId === online.playerId) return 'Tu';
   return online.seats?.[playerId]?.name || PLAYERS[playerId].name;
 }
 
@@ -571,23 +574,63 @@ function trickHtml() {
     </div>`;
 }
 
+function playerDisplayName(playerId) {
+  if (online.enabled && online.seats?.[playerId]?.name) return online.seats[playerId].name;
+  return PLAYERS[playerId].name;
+}
+
 function onlinePanelHtml() {
-  const seatLines = PLAYERS.map((player) => `<span>${player.name}: ${online.seats?.[player.id]?.name || 'libero'}</span>`).join('');
-  const seatButtons = PLAYERS.map(
-    (player) =>
-      `<button class="seat-button ${online.preferredSeat === player.id ? 'active' : ''}" data-seat="${player.id}"><span>${player.name}</span><small>${TEAM_NAMES[player.team]}</small></button>`,
-  ).join('');
+  if (!online.enabled) {
+    // Pre-join: name + create/join
+    return `
+      <div class="panel control-panel">
+        <div class="panel-title"><span>⌁</span><span>Gioca online</span></div>
+        <label class="field-label">Il tuo nome
+          <input id="playerNameInput" class="share-input" placeholder="Es. Marco" value="${escapeHtml(online.playerName)}" maxlength="20" />
+        </label>
+        <div class="button-row" style="margin-top:8px">
+          <button class="primary" id="createRoom"><span>＋</span>Crea stanza</button>
+          <button class="secondary" id="joinRoom"><span>→</span>Entra</button>
+        </div>
+        <input id="roomCodeInput" class="share-input" placeholder="Codice stanza" value="${online.room || ''}" style="margin-top:6px" />
+        ${online.error ? `<p class="muted">${escapeHtml(online.error)}</p>` : ''}
+      </div>`;
+  }
+
+  // Lobby: seat picker + player list
+  const myId = online.playerId;
+  const occupied = online.seats || {};
+  const allFull = Object.keys(occupied).length === 4;
+
+  const teamRows = [
+    { team: 0, name: TEAM_NAMES[0], seats: [0, 2] },
+    { team: 1, name: TEAM_NAMES[1], seats: [1, 3] },
+  ];
+
+  const lobbyGrid = teamRows.map((t) => `
+    <div class="lobby-team">
+      <div class="lobby-team-label">${t.name}</div>
+      ${t.seats.map((sid) => {
+        const occ = occupied[sid];
+        const isMe = sid === myId;
+        const isFree = !occ;
+        return `<button class="lobby-seat ${isMe ? 'me' : ''} ${occ && !isMe ? 'taken' : ''} ${isFree ? 'free' : ''}" data-seat="${sid}">
+          <span class="lobby-seat-pos">${PLAYERS[sid].seat === 'south' || PLAYERS[sid].seat === 'north' ? (PLAYERS[sid].seat === 'south' ? '↓ Sud' : '↑ Nord') : (PLAYERS[sid].seat === 'west' ? '← Ovest' : 'Est →')}</span>
+          <span class="lobby-seat-name">${occ ? escapeHtml(occ.name) : 'Libero'}</span>
+          ${isMe ? '<span class="lobby-you">Tu</span>' : ''}
+        </button>`;
+      }).join('')}
+    </div>`).join('');
+
   return `
     <div class="panel control-panel">
-      <div class="panel-title"><span>⌁</span><span>Stanza online</span></div>
-      <div class="seat-grid">${seatButtons}</div>
-      ${
-        online.enabled
-          ? `<div class="room-code"><span>Codice</span><strong>${online.room}</strong></div>
-             <div class="history">${seatLines}</div>`
-          : `<div class="button-row"><button class="primary" id="createRoom"><span>＋</span>Crea stanza</button><button class="secondary" id="joinRoom"><span>→</span>Entra</button></div>
-             <input id="roomCodeInput" class="share-input" placeholder="Codice stanza" value="${online.room || ''}" />`
-      }
+      <div class="panel-title"><span>⌁</span><span>Stanza ${escapeHtml(online.room)}</span></div>
+      <div class="room-code-row">
+        <span>Codice:</span><strong>${escapeHtml(online.room)}</strong>
+        <button class="copy-btn" id="copyRoomCode">📋</button>
+      </div>
+      <div class="lobby-grid">${lobbyGrid}</div>
+      ${allFull ? '<p class="lobby-ready">✓ Tutti pronti — la partita è in corso</p>' : `<p class="muted">In attesa di ${4 - Object.keys(occupied).length} giocatori…</p>`}
       ${online.error ? `<p class="muted">${escapeHtml(online.error)}</p>` : ''}
     </div>`;
 }
@@ -781,11 +824,19 @@ function bindEvents() {
   });
   document.querySelector('#createRoom')?.addEventListener('click', createRoom);
   document.querySelector('#joinRoom')?.addEventListener('click', () => joinRoom(document.querySelector('#roomCodeInput')?.value.trim().toUpperCase()));
-  document.querySelectorAll('.seat-button').forEach((button) => {
+  document.querySelector('#playerNameInput')?.addEventListener('input', (e) => {
+    online.playerName = e.target.value;
+    localStorage.setItem('belote-player-name', online.playerName);
+  });
+  document.querySelector('#copyRoomCode')?.addEventListener('click', () => {
+    navigator.clipboard.writeText(online.room).catch(() => {});
+  });
+  document.querySelectorAll('.lobby-seat').forEach((button) => {
     button.addEventListener('click', () => {
-      online.preferredSeat = Number(button.dataset.seat);
-      localStorage.setItem('belote-preferred-seat', String(online.preferredSeat));
-      if (online.enabled) sendOnlineAction({ type: 'changeSeat', seat: online.preferredSeat });
+      const seat = Number(button.dataset.seat);
+      online.preferredSeat = seat;
+      localStorage.setItem('belote-preferred-seat', String(seat));
+      if (online.enabled) sendOnlineAction({ type: 'changeSeat', seat });
       else render();
     });
   });
@@ -868,7 +919,7 @@ function applyOnlinePayload(payload) {
 
 async function createRoom() {
   try {
-    applyOnlinePayload(await api('/api/rooms', { method: 'POST', body: { name: 'Giocatore', seat: online.preferredSeat } }));
+    applyOnlinePayload(await api('/api/rooms', { method: 'POST', body: { name: online.playerName || 'Giocatore', seat: online.preferredSeat } }));
   } catch (error) {
     online.error = 'Avvia server.js per creare stanze online.';
     render();
@@ -878,7 +929,7 @@ async function createRoom() {
 async function joinRoom(room) {
   if (!room) return;
   try {
-    applyOnlinePayload(await api(`/api/rooms/${room}/join`, { method: 'POST', body: { token: online.token, name: 'Giocatore', seat: online.preferredSeat } }));
+    applyOnlinePayload(await api(`/api/rooms/${room}/join`, { method: 'POST', body: { token: online.token, name: online.playerName || 'Giocatore', seat: online.preferredSeat } }));
   } catch (error) {
     online.error = 'Stanza non trovata o piena.';
     render();
